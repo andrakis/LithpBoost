@@ -9,7 +9,7 @@ int main(void) {
 	LithpObject_p v = l.pop();
 
 	LithpObject *o = v.get();
-	LithpInteger *i = dynamic_cast<LithpInteger*>(o);
+	LithpInteger *i = o->GetClass<LithpInteger>();
 	i->Test();
 
 	//std::string r;

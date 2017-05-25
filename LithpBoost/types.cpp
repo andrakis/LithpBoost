@@ -4,6 +4,7 @@
 
 LithpObject::~LithpObject() {
 	std::cout << "~LithpObject(" << GetLithpType(this->type) << ")" << std::endl;
+	this->freeObject();
 }
 
 std::string GetLithpType(LithpType t) {

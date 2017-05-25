@@ -32,6 +32,20 @@ enum LithpType {
 
 std::string GetLithpType(LithpType t);
 
+// Forward declarations
+class LithpObject;
+typedef std::shared_ptr<LithpObject> LithpObject_p;
+typedef std::vector<LithpObject_p> LithpList_t;
+class LithpList;
+typedef std::shared_ptr<LithpList> LithpList_p;
+typedef std::map<std::string, LithpObject_p> LithpDict_t;
+class LithpDict;
+typedef std::shared_ptr<LithpDict> LithpDict_p;
+class LithpOpChain;
+class LithpClosure;
+typedef std::shared_ptr<LithpOpChain> LithpOpChain_p;
+typedef std::shared_ptr<LithpClosure> LithpClosure_p;
+
 class LithpObject {
 public:
 	LithpObject(boost::any v, LithpType t) : value(v), type(t) {
@@ -51,7 +65,16 @@ public:
 	template<typename T> T GetValue() {
 		return boost::any_cast<T>(this->value);
 	}
+	template<class C> C* GetClass() {
+		return dynamic_cast<C*>(this);
+	}
+
+	virtual LithpInt *IntValue() { throw LithpException(); }
+	virtual double *FloatValue() { throw LithpException(); }
+	virtual LithpList_t *ListValue() { throw LithpException(); }
+	virtual LithpDict_t *DictValue() { throw LithpException(); }
 protected:
+	virtual void freeObject() {  }
 	const LithpType type;
 	const boost::any value;
 private:
@@ -78,6 +101,7 @@ public:
 	}
 	LithpObject *coerce(LithpType to);
 protected:
+	void freeObject() { free(this->IntValue()); }
 private:
 };
 
@@ -86,7 +110,7 @@ public:
 	LithpFloat(float v) : LithpObject(new double((double)v), Float) {}
 	LithpFloat(double v) : LithpObject(new double(v), Float) {}
 	LithpFloat(int v) : LithpObject(new double((double)v), Float) {}
-	float* FloatValue() { return this->GetValue<float*>(); }
+	double* FloatValue() { return this->GetValue<double*>(); }
 	bool can_coerce(LithpType to) {
 		switch (to) {
 		case Integer:
@@ -98,6 +122,7 @@ public:
 		}
 	}
 protected:
+	void freeObject() { free(this->FloatValue()); }
 };
 
 class LithpString : public LithpObject {
@@ -106,13 +131,10 @@ public:
 	LithpString() : LithpObject(new std::string(""), String) {}
 	std::string* StringValue() { return this->GetValue<std::string*>(); }
 protected:
+	void freeObject() { free(this->StringValue()); }
 private:
 };
 
-typedef std::shared_ptr<LithpObject> LithpObject_p;
-typedef std::vector<LithpObject_p> LithpList_t;
-class LithpList;
-typedef std::shared_ptr<LithpList> LithpList_p;
 class LithpList : public LithpObject {
 public:
 	LithpList() : LithpObject(new LithpList_t(), List) { }
@@ -122,12 +144,9 @@ public:
 protected:
 	LithpList(LithpType type) : LithpObject(new LithpList_t(), type) { }
 	LithpList(LithpList_t v, LithpType type) : LithpObject(new LithpList_t(v), type) { }
+	void freeObject() { free(this->ListValue()); }
 private:
 };
-
-typedef std::map<std::string, LithpObject_p> LithpDict_t;
-class LithpDict;
-typedef std::shared_ptr<LithpDict> LithpDict_p;
 
 class LithpDict : public LithpObject {
 public:
@@ -138,13 +157,10 @@ public:
 protected:
 	LithpDict(LithpType type) : LithpObject(new LithpDict_t(), type) { }
 	LithpDict(LithpDict_t v, LithpType type) : LithpObject(new LithpDict_t(v), type) { }
+	void freeObject() { free(this->DictValue()); }
 private:
 };
 
-class LithpOpChain;
-class LithpClosure;
-typedef std::shared_ptr<LithpOpChain> LithpOpChain_p;
-typedef std::shared_ptr<LithpClosure> LithpClosure_p;
 class LithpClosure : public LithpDict {
 public:
 	LithpClosure(LithpOpChain* _owner) : LithpDict(OpChainClosure),
@@ -179,8 +195,8 @@ public:
 		this->closure = LithpClosure_p(new LithpClosure(this, parent.get()->closure));
 	}
 	void rewind() { this->pos = -1; }
-	LithpObject_p next();
-	LithpObject_p get();
+	LithpObject* next();
+	LithpObject* get();
 	void add(LithpObject* op);
 
 protected:
