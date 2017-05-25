@@ -4,12 +4,12 @@
 
 LithpObject::~LithpObject() {
 	std::cout << "~LithpObject(" << GetLithpType(this->type) << ")" << std::endl;
-	this->freeObject();
 }
 
 std::string GetLithpType(LithpType t) {
 	switch (t) {
 	case Integer: return std::string("Integer");
+	case Float: return std::string("Float");
 	case String: return std::string("String");
 	case List: return std::string("List");
 	case Dict: return std::string("Dict");

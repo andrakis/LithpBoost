@@ -6,6 +6,7 @@ int main(void) {
 	LithpList l;
 
 	l.push(new LithpInteger(123));
+	l.push(new LithpFloat(123));
 	LithpObject_p v = l.pop();
 
 	LithpObject *o = v.get();

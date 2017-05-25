@@ -74,7 +74,6 @@ public:
 	virtual LithpList_t *ListValue() { throw LithpException(); }
 	virtual LithpDict_t *DictValue() { throw LithpException(); }
 protected:
-	virtual void freeObject() {  }
 	const LithpType type;
 	const boost::any value;
 private:
@@ -87,6 +86,7 @@ public:
 	LithpInteger(long v) : LithpInteger(LithpInt(v)) {}
 	LithpInteger(unsigned int v) : LithpInteger(LithpInt(v)) {}
 	LithpInteger(unsigned long v) : LithpInteger(LithpInt(v)) {}
+	~LithpInteger() { delete(this->IntValue()); }
 	LithpInt *IntValue() { return this->GetValue<LithpInt*>(); }
 	void Test();
 	bool can_coerce(LithpType to) {
@@ -101,7 +101,6 @@ public:
 	}
 	LithpObject *coerce(LithpType to);
 protected:
-	void freeObject() { free(this->IntValue()); }
 private:
 };
 
@@ -110,6 +109,7 @@ public:
 	LithpFloat(float v) : LithpObject(new double((double)v), Float) {}
 	LithpFloat(double v) : LithpObject(new double(v), Float) {}
 	LithpFloat(int v) : LithpObject(new double((double)v), Float) {}
+	~LithpFloat() { delete(this->FloatValue()); }
 	double* FloatValue() { return this->GetValue<double*>(); }
 	bool can_coerce(LithpType to) {
 		switch (to) {
@@ -122,29 +122,31 @@ public:
 		}
 	}
 protected:
-	void freeObject() { free(this->FloatValue()); }
 };
 
 class LithpString : public LithpObject {
 public:
 	LithpString(std::string v) : LithpObject(new std::string(v), String) {}
 	LithpString() : LithpObject(new std::string(""), String) {}
+	~LithpString() { delete(this->StringValue()); }
 	std::string* StringValue() { return this->GetValue<std::string*>(); }
 protected:
-	void freeObject() { free(this->StringValue()); }
 private:
 };
 
 class LithpList : public LithpObject {
 public:
 	LithpList() : LithpObject(new LithpList_t(), List) { }
+	~LithpList() {
+		LithpList_t *l = this->ListValue();
+		l->clear();
+	}
 	void push(LithpObject *v);
 	LithpObject_p pop();
 	LithpList_t* ListValue() { return this->GetValue<LithpList_t*>(); }
 protected:
 	LithpList(LithpType type) : LithpObject(new LithpList_t(), type) { }
 	LithpList(LithpList_t v, LithpType type) : LithpObject(new LithpList_t(v), type) { }
-	void freeObject() { free(this->ListValue()); }
 private:
 };
 
@@ -152,12 +154,12 @@ class LithpDict : public LithpObject {
 public:
 	LithpDict() : LithpObject(new LithpDict_t(), Dict) { 
 	}
+	~LithpDict() { delete(this->DictValue()); }
 	LithpDict_t* DictValue() { return this->GetValue<LithpDict_t*>(); }
 	LithpObject* Get(std::string name);
 protected:
 	LithpDict(LithpType type) : LithpObject(new LithpDict_t(), type) { }
 	LithpDict(LithpDict_t v, LithpType type) : LithpObject(new LithpDict_t(v), type) { }
-	void freeObject() { free(this->DictValue()); }
 private:
 };
 
