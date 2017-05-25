@@ -140,6 +140,7 @@ public:
 	~LithpList() {
 		LithpList_t *l = this->ListValue();
 		l->clear();
+		// TODO: delete list too?
 	}
 	void push(LithpObject *v);
 	LithpObject_p pop();
@@ -154,7 +155,11 @@ class LithpDict : public LithpObject {
 public:
 	LithpDict() : LithpObject(new LithpDict_t(), Dict) { 
 	}
-	~LithpDict() { delete(this->DictValue()); }
+	~LithpDict() {
+		LithpDict_t *dict = this->DictValue();
+		dict->clear();
+		// TODO: delete dict too?
+	}
 	LithpDict_t* DictValue() { return this->GetValue<LithpDict_t*>(); }
 	LithpObject* Get(std::string name);
 protected:
@@ -175,14 +180,66 @@ public:
 	{
 	}
 	LithpClosure_p parent = 0;
+	LithpClosure_p getParent() { return this->parent; }
 	LithpClosure_p topmost = 0;
 	LithpOpChain_p owner = 0;
 	LithpOpChain_p getOwner() { return this->owner; }
-	LithpOpChain_p getTopOwner() {
+	LithpClosure_p getTopOwner() {
 		if (this->parent != 0) {
-			LithpDict_t* d = this->DictValue();
-
+			return this->parent.get()->getTopOwner();
 		}
+		return LithpClosure_p(this);
+	}
+
+	bool has_key(std::string key) {
+		LithpDict_t *dict = this->DictValue();
+		LithpDict_t::iterator it = dict->find(key);
+		if (it == dict->end())
+			return false;
+		return true;
+	}
+	bool do_set(std::string key, LithpObject_p item) {
+		if (this->has_key(key)) {
+			this->set_immediate(key, item);
+			return true;
+		} else if (this->parent != 0) {
+			if (this->getParent()->do_set(key, item))
+				return true;
+		}
+		this->set_immediate(key, item);
+		return true;
+	}
+	void set(std::string key, LithpObject_p item) {
+		if (this->try_set(key, item))
+			return;
+		if (this->parent != 0) {
+			if (this->getParent()->try_set(key, item))
+				return;
+		}
+		this->set_immediate(key, item);
+	}
+	void set_immediate(std::string key, LithpObject_p item) {
+		LithpDict_t *dict = this->DictValue();
+		dict->emplace(key, item);
+	}
+	bool try_set(std::string key, LithpObject_p item) {
+		if (this->has_key(key)) {
+			this->set_immediate(key, item);
+			return true;
+		} else if (this->parent != 0) {
+			if (this->getParent()->try_set(key, item))
+				return true;
+		}
+		return false;
+	}
+	LithpObject_p get(std::string key) {
+		LithpDict_t *dict = this->DictValue();
+		LithpDict_t::iterator it = dict->find(key);
+		if (it != dict->end())
+			return it->second;
+		if (this->parent != 0)
+			return this->getParent()->get(key);
+		throw LithpException();
 	}
 protected:
 private:
