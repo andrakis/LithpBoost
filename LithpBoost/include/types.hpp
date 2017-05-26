@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+namespace lithp {
+
 class LithpException : public std::exception {
 	virtual const char* what() const throw() {
 		return "Lithp Exception";
@@ -84,12 +86,12 @@ public:
 	void Test();
 	bool can_coerce(LithpType to) {
 		switch (to) {
-		case Float:
-			return true;
-		case String:
-			return true;
-		default:
-			return false;
+			case Float:
+				return true;
+			case String:
+				return true;
+			default:
+				return false;
 		}
 	}
 	LithpObject *coerce(LithpType to);
@@ -106,12 +108,12 @@ public:
 	double* FloatValue() { return this->GetValue<double*>(); }
 	bool can_coerce(LithpType to) {
 		switch (to) {
-		case Integer:
-			return true;
-		case String:
-			return true;
-		default:
-			return false;
+			case Integer:
+				return true;
+			case String:
+				return true;
+			default:
+				return false;
 		}
 	}
 protected:
@@ -146,7 +148,7 @@ private:
 
 class LithpDict : public LithpObject {
 public:
-	LithpDict() : LithpObject(new LithpDict_t(), Dict) { 
+	LithpDict() : LithpObject(new LithpDict_t(), Dict) {
 	}
 	~LithpDict() {
 		LithpDict_t *dict = this->DictValue();
@@ -173,17 +175,23 @@ public:
 	{
 	}
 	LithpClosure_p parent = 0;
-	LithpClosure_p getParent() { return this->parent; }
+	LithpClosure* getParent() { return this->parent.get(); }
 	LithpClosure_p topmost = 0;
+	LithpClosure* getTopmost() { return this->topmost.get(); }
 	LithpOpChain_p owner = 0;
-	LithpOpChain_p getOwner() { return this->owner; }
-	LithpClosure_p getTopOwner() {
-		if (this->parent != 0) {
-			return this->parent.get()->getTopOwner();
-		}
-		return LithpClosure_p(this);
-	}
+	LithpOpChain* getOwner() { return this->owner.get(); }
 
+	// Implement these functions inline for speed.
+	// These functions, especially get, are some of the most costly
+	// and often-called functions.
+
+
+	LithpClosure* getTopOwner() {
+		if (this->parent != 0) {
+			return this->getParent()->getTopOwner();
+		}
+		return this;
+	}
 	bool has_key(std::string key) {
 		LithpDict_t *dict = this->DictValue();
 		LithpDict_t::iterator it = dict->find(key);
@@ -257,3 +265,4 @@ protected:
 	LithpClosure_p closure = 0;
 private:
 };
+}

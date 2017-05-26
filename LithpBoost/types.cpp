@@ -2,18 +2,20 @@
 
 #include <iostream>
 
+namespace lithp {
+
 LithpObject::~LithpObject() {
 	std::cout << "~LithpObject(" << GetLithpType(this->type) << ")" << std::endl;
 }
 
 std::string GetLithpType(LithpType t) {
 	switch (t) {
-	case Integer: return std::string("Integer");
-	case Float: return std::string("Float");
-	case String: return std::string("String");
-	case List: return std::string("List");
-	case Dict: return std::string("Dict");
-	default: return std::string("Unknown");
+		case Integer: return std::string("Integer");
+		case Float: return std::string("Float");
+		case String: return std::string("String");
+		case List: return std::string("List");
+		case Dict: return std::string("Dict");
+		default: return std::string("Unknown");
 	}
 }
 
@@ -24,18 +26,18 @@ void LithpInteger::Test() {
 LithpObject* LithpInteger::coerce(LithpType to) {
 	LithpInt* v = this->IntValue();
 	switch (to) {
-	case Float:
-		return new LithpFloat((double)(*v));
-	case String:
-		// Brackets required, orelse compiler error C2361 thrown.
-		// C++, you confuse me.
+		case Float:
+			return new LithpFloat((double)(*v));
+		case String:
+			// Brackets required, orelse compiler error C2361 thrown.
+			// C++, you confuse me.
 		{
 			std::string s;
 			s = "TODO";
 			return dynamic_cast<LithpObject*>(new LithpString(s));
 		}
-	default:
-		throw LithpException();
+		default:
+			throw LithpException();
 	}
 }
 
@@ -51,3 +53,4 @@ LithpObject_p LithpList::pop() {
 	return p;
 }
 
+}
