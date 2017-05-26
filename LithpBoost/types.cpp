@@ -31,7 +31,7 @@ LithpObject* LithpInteger::coerce(LithpType to) {
 		// C++, you confuse me.
 		{
 			std::string s;
-			s.append(v->str());
+			s = "TODO";
 			return dynamic_cast<LithpObject*>(new LithpString(s));
 		}
 	default:

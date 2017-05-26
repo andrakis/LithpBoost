@@ -1,14 +1,8 @@
 #pragma once
 
-#include <boost/shared_ptr.hpp>
-#include <boost/property_tree/ptree.hpp>
-#include <boost/multiprecision/cpp_int.hpp>
-#include <boost/variant/recursive_wrapper.hpp>
-#include <boost/variant/recursive_variant.hpp>
-#include <boost/variant/variant.hpp>
-
 #include <exception>
 #include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -18,7 +12,7 @@ class LithpException : public std::exception {
 	}
 };
 
-typedef boost::multiprecision::cpp_int LithpInt;
+typedef long long LithpInt;
 
 enum LithpType {
 	Integer,
@@ -34,23 +28,23 @@ std::string GetLithpType(LithpType t);
 
 // Forward declarations
 class LithpObject;
-typedef std::shared_ptr<LithpObject> LithpObject_p;
-typedef std::vector<LithpObject_p> LithpList_t;
+	typedef std::shared_ptr<LithpObject> LithpObject_p;
 class LithpList;
-typedef std::shared_ptr<LithpList> LithpList_p;
-typedef std::map<std::string, LithpObject_p> LithpDict_t;
+	typedef std::shared_ptr<LithpList> LithpList_p;
+	typedef std::vector<LithpObject_p> LithpList_t;
 class LithpDict;
-typedef std::shared_ptr<LithpDict> LithpDict_p;
+	typedef std::shared_ptr<LithpDict> LithpDict_p;
+	typedef std::map<std::string, LithpObject_p> LithpDict_t;
 class LithpOpChain;
+	typedef std::shared_ptr<LithpOpChain> LithpOpChain_p;
 class LithpClosure;
-typedef std::shared_ptr<LithpOpChain> LithpOpChain_p;
-typedef std::shared_ptr<LithpClosure> LithpClosure_p;
+	typedef std::shared_ptr<LithpClosure> LithpClosure_p;
 
 class LithpObject {
 public:
-	LithpObject(boost::any v, LithpType t) : value(v), type(t) {
+	LithpObject(void* v, LithpType t) : value(v), type(t) {
 	}
-	LithpObject(const LithpObject &o) : value(o.GetValue()), type(o.GetType()) {
+	LithpObject(const LithpObject &o) : value(o.value), type(o.GetType()) {
 	}
 	virtual ~LithpObject();
 
@@ -61,9 +55,8 @@ public:
 		throw LithpException();
 	}
 	LithpType GetType() const { return this->type; }
-	boost::any GetValue() const { return this->value; }
 	template<typename T> T GetValue() {
-		return boost::any_cast<T>(this->value);
+		return (T)this->value;
 	}
 	template<class C> C* GetClass() {
 		return dynamic_cast<C*>(this);
@@ -75,7 +68,7 @@ public:
 	virtual LithpDict_t *DictValue() { throw LithpException(); }
 protected:
 	const LithpType type;
-	const boost::any value;
+	void* value;
 private:
 };
 
@@ -138,9 +131,9 @@ class LithpList : public LithpObject {
 public:
 	LithpList() : LithpObject(new LithpList_t(), List) { }
 	~LithpList() {
-		LithpList_t *l = this->ListValue();
-		l->clear();
-		// TODO: delete list too?
+		LithpList_t *list = this->ListValue();
+		list->clear();
+		delete list;
 	}
 	void push(LithpObject *v);
 	LithpObject_p pop();
@@ -158,7 +151,7 @@ public:
 	~LithpDict() {
 		LithpDict_t *dict = this->DictValue();
 		dict->clear();
-		// TODO: delete dict too?
+		delete dict;
 	}
 	LithpDict_t* DictValue() { return this->GetValue<LithpDict_t*>(); }
 	LithpObject* Get(std::string name);
