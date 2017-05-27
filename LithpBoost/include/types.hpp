@@ -42,6 +42,7 @@ class LithpOpChain;
 class LithpClosure;
 	typedef std::shared_ptr<LithpClosure> LithpClosure_p;
 
+/// The base Lithp object.
 class LithpObject {
 public:
 	LithpObject(void* v, LithpType t) : value(v), type(t) {
@@ -57,10 +58,10 @@ public:
 		throw LithpException();
 	}
 	LithpType GetType() const { return this->type; }
-	template<typename T> T GetValue() {
+	template<typename T> T GetValue() const {
 		return (T)this->value;
 	}
-	template<class C> C* GetClass() {
+	template<class C> C* GetClass() const {
 		return dynamic_cast<C*>(this);
 	}
 
@@ -68,7 +69,12 @@ public:
 	virtual double *FloatValue() { throw LithpException(); }
 	virtual LithpList_t *ListValue() { throw LithpException(); }
 	virtual LithpDict_t *DictValue() { throw LithpException(); }
+
+	std::string str() {
+		return this->_str();
+	}
 protected:
+	virtual std::string _str() = 0;
 	const LithpType type;
 	void* value;
 private:
@@ -82,7 +88,7 @@ public:
 	LithpInteger(unsigned int v) : LithpInteger(LithpInt(v)) {}
 	LithpInteger(unsigned long v) : LithpInteger(LithpInt(v)) {}
 	~LithpInteger() { delete(this->IntValue()); }
-	LithpInt *IntValue() { return this->GetValue<LithpInt*>(); }
+	LithpInt *IntValue() const { return this->GetValue<LithpInt*>(); }
 	void Test();
 	bool can_coerce(LithpType to) {
 		switch (to) {
@@ -96,6 +102,7 @@ public:
 	}
 	LithpObject *coerce(LithpType to);
 protected:
+	std::string _str();
 private:
 };
 
@@ -105,7 +112,7 @@ public:
 	LithpFloat(double v) : LithpObject(new double(v), Float) {}
 	LithpFloat(int v) : LithpObject(new double((double)v), Float) {}
 	~LithpFloat() { delete(this->FloatValue()); }
-	double* FloatValue() { return this->GetValue<double*>(); }
+	double* FloatValue() const { return this->GetValue<double*>(); }
 	bool can_coerce(LithpType to) {
 		switch (to) {
 			case Integer:
@@ -117,6 +124,7 @@ public:
 		}
 	}
 protected:
+	std::string _str();
 };
 
 class LithpString : public LithpObject {
@@ -126,6 +134,7 @@ public:
 	~LithpString() { delete(this->StringValue()); }
 	std::string* StringValue() { return this->GetValue<std::string*>(); }
 protected:
+	std::string _str();
 private:
 };
 
@@ -139,10 +148,14 @@ public:
 	}
 	void push(LithpObject *v);
 	LithpObject_p pop();
-	LithpList_t* ListValue() { return this->GetValue<LithpList_t*>(); }
+	LithpList_t* ListValue() const { return this->GetValue<LithpList_t*>(); }
+	size_t length() const {
+		return this->ListValue()->size();
+	}
 protected:
 	LithpList(LithpType type) : LithpObject(new LithpList_t(), type) { }
 	LithpList(LithpList_t v, LithpType type) : LithpObject(new LithpList_t(v), type) { }
+	std::string _str();
 private:
 };
 
@@ -155,11 +168,12 @@ public:
 		dict->clear();
 		delete dict;
 	}
-	LithpDict_t* DictValue() { return this->GetValue<LithpDict_t*>(); }
+	LithpDict_t* DictValue() const { return this->GetValue<LithpDict_t*>(); }
 	LithpObject* Get(std::string name);
 protected:
 	LithpDict(LithpType type) : LithpObject(new LithpDict_t(), type) { }
 	LithpDict(LithpDict_t v, LithpType type) : LithpObject(new LithpDict_t(v), type) { }
+	std::string _str();
 private:
 };
 
@@ -167,13 +181,12 @@ class LithpClosure : public LithpDict {
 public:
 	LithpClosure(LithpOpChain* _owner) : LithpDict(OpChainClosure),
 		owner(_owner), topmost(LithpClosure_p(this))
-	{
-	}
+	{ }
 	LithpClosure(LithpOpChain* _owner, LithpClosure_p _parent) : LithpDict(OpChainClosure),
 		parent(_parent), topmost(_parent.get()->parent),
 		owner(_owner)
-	{
-	}
+	{ }
+
 	LithpClosure_p parent = 0;
 	LithpClosure* getParent() { return this->parent.get(); }
 	LithpClosure_p topmost = 0;
@@ -248,21 +261,25 @@ private:
 
 class LithpOpChain : protected LithpList {
 public:
-	LithpOpChain() : LithpList(OpChain) {
-		this->closure = LithpClosure_p(new LithpClosure(this));
+	LithpOpChain() : LithpList(OpChain),
+		closure(LithpClosure_p(new LithpClosure(this))) {
 	}
-	LithpOpChain(LithpOpChain_p parent, LithpList_t ops) : LithpList(ops, OpChain), parent(parent) {
-		this->closure = LithpClosure_p(new LithpClosure(this, parent.get()->closure));
+	LithpOpChain(LithpOpChain_p parent, LithpList_t ops) :
+		LithpList(ops, OpChain), parent(parent),
+		closure(LithpClosure_p(new LithpClosure(this, parent.get()->closure))) {
 	}
 	void rewind() { this->pos = -1; }
 	LithpObject* next();
 	LithpObject* get();
 	void add(LithpObject* op);
 
+	LithpOpChain* getParent() const { return this->parent.get(); }
+	LithpClosure* getClosure() const { return this->closure.get(); }
+
 protected:
 	int pos = -1;
-	LithpOpChain_p parent = 0;
-	LithpClosure_p closure = 0;
+	const LithpOpChain_p parent;
+	const LithpClosure_p closure;
 private:
 };
 }

@@ -41,6 +41,21 @@ LithpObject* LithpInteger::coerce(LithpType to) {
 	}
 }
 
+std::string LithpInteger::_str() {
+	return "INT";
+}
+
+std::string LithpFloat::_str() {
+	return "FLOAT";
+}
+
+std::string LithpString::_str() {
+	std::string r = "\"";
+	r += *this->StringValue();
+	r += "\"";
+	return r;
+}
+
 void LithpList::push(LithpObject *v) {
 	LithpObject_p p(v);
 	LithpList_t* l = this->ListValue();
@@ -51,6 +66,14 @@ LithpObject_p LithpList::pop() {
 	LithpObject_p p = l->back();
 	l->pop_back();
 	return p;
+}
+
+std::string LithpList::_str() {
+	return "LIST";
+}
+
+std::string LithpDict::_str() {
+	return "DICT";
 }
 
 }

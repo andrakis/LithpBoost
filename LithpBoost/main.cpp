@@ -13,21 +13,7 @@ int main(void) {
 	for (int x = 0; x < 2; x++) {
 		LithpObject_p v = l.pop();
 		LithpObject *o = v.get();
-		switch (o->GetType()) {
-			case Integer:
-			{
-				LithpInteger *i = o->GetClass<LithpInteger>();
-				i->Test();
-				std::cout << "Int: " << *i->IntValue() << std::endl;
-				break;
-			}
-			case Float:
-			{
-				LithpFloat *f = o->GetClass<LithpFloat>();
-				std::cout << "Float: " << *f->FloatValue() << std::endl;
-				break;
-			}
-		}
+		std::cout << "Type: " << GetLithpType(o->GetType()) << ", value: " << o->str() << std::endl;
 	}
 
 	//std::string r;
