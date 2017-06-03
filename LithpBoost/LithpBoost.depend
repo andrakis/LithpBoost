@@ -1,0 +1,16 @@
+# depslib dependency file v1.0
+1496417598 source:c:\users\daedalus\documents\visual studio 2015\projects\lithpboost\lithpboost\main.cpp
+	<iostream>
+	"include/types.hpp"
+
+1496487814 c:\users\daedalus\documents\visual studio 2015\projects\lithpboost\lithpboost\include\types.hpp
+	<exception>
+	<map>
+	<memory>
+	<string>
+	<vector>
+
+1496487822 source:c:\users\daedalus\documents\visual studio 2015\projects\lithpboost\lithpboost\types.cpp
+	"include/types.hpp"
+	<iostream>
+
