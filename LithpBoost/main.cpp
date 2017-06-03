@@ -13,6 +13,8 @@ int main(void) {
 	for (int x = 0; x < 2; x++) {
 		LithpObject_p v = l.pop();
 		LithpObject *o = v.get();
+		// Look ma, no casting!
+		// Note to self: virtual methods instead of dynamic_cast's
 		std::cout << "Type: " << GetLithpType(o->GetType()) << ", value: " << o->str() << std::endl;
 	}
 

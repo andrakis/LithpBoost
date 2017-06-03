@@ -4,6 +4,18 @@
 
 namespace lithp {
 
+LithpObject *lithp_int(LithpInt i) {
+	return new LithpInteger(i);
+}
+
+LithpObject *lithp_flt(LithpFlt f) {
+	return new LithpFloat(f);
+}
+
+LithpObject *lithp_str(std::string s) {
+	return new LithpString(s);
+}
+
 LithpObject::~LithpObject() {
 	std::cout << "~LithpObject(" << GetLithpType(this->type) << ")" << std::endl;
 }
@@ -24,10 +36,10 @@ void LithpInteger::Test() {
 }
 
 LithpObject* LithpInteger::coerce(LithpType to) {
-	LithpInt* v = this->IntValue();
+	LithpInt v = this->IntValue();
 	switch (to) {
 		case Float:
-			return new LithpFloat((double)(*v));
+			return new LithpFloat((double)v);
 		case String:
 			// Brackets required, orelse compiler error C2361 thrown.
 			// C++, you confuse me.
@@ -51,7 +63,7 @@ std::string LithpFloat::_str() {
 
 std::string LithpString::_str() {
 	std::string r = "\"";
-	r += *this->StringValue();
+	r += this->StringValue();
 	r += "\"";
 	return r;
 }
@@ -76,4 +88,42 @@ std::string LithpDict::_str() {
 	return "DICT";
 }
 
+// Atoms
+static std::map<std::string,LithpAtom_p> atoms_by_name;
+static std::map<int, LithpAtom_p> atoms_by_id;
+static int atom_id_counter = 0;
+LithpAtom_p GetAtom(int id) {
+	return atoms_by_id[id];
+}
+LithpAtom_p GetAtom(std::string name) {
+	std::map<std::string, LithpAtom_p>::iterator it = atoms_by_name.find(name);
+	if (it == atoms_by_name.end()) {
+		int id = atom_id_counter++;
+		LithpAtom *a = new LithpAtom(name, id);
+		LithpAtom_p p = LithpAtom_p(a);
+		atoms_by_name.emplace(name, p);
+		atoms_by_id.emplace(id, p);
+		return p;
+	}
+	return it->second;
+}
+
+// OpChains
+LithpObject *LithpOpChain::next() {
+	int id = ++this->pos;
+	if ((unsigned)id >= this->length())
+		return nullptr;
+	LithpObject *p = this->at(++this->pos).get();
+	this->current = p;
+	return p;
+}
+
+LithpObject *LithpOpChain::get() {
+	return this->current;
+}
+
+void LithpOpChain::add(LithpObject *op) {
+	LithpObject_p p(op);
+
+}
 }

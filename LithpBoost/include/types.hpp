@@ -15,6 +15,7 @@ class LithpException : public std::exception {
 };
 
 typedef long long LithpInt;
+typedef double LithpFlt;
 
 enum LithpType {
 	Integer,
@@ -23,7 +24,8 @@ enum LithpType {
 	List,
 	Dict,
 	OpChain,
-	OpChainClosure
+	OpChainClosure,
+	Atom
 };
 
 std::string GetLithpType(LithpType t);
@@ -31,6 +33,9 @@ std::string GetLithpType(LithpType t);
 // Forward declarations
 class LithpObject;
 	typedef std::shared_ptr<LithpObject> LithpObject_p;
+class LithpInteger;
+class LithpFloat;
+class LithpString;
 class LithpList;
 	typedef std::shared_ptr<LithpList> LithpList_p;
 	typedef std::vector<LithpObject_p> LithpList_t;
@@ -45,18 +50,14 @@ class LithpClosure;
 /// The base Lithp object.
 class LithpObject {
 public:
-	LithpObject(void* v, LithpType t) : value(v), type(t) {
+	LithpObject(void* v, LithpType t) : type(t), value(v) {
 	}
-	LithpObject(const LithpObject &o) : value(o.value), type(o.GetType()) {
+	LithpObject(const LithpObject &o) : type(o.GetType()), value(o.value) {
 	}
 	virtual ~LithpObject();
 
-	virtual bool can_coerce(LithpType to) {
-		return false;
-	}
-	virtual LithpObject *coerce(LithpType to) {
-		throw LithpException();
-	}
+	virtual bool can_coerce(LithpType to) = 0;
+	virtual LithpObject *coerce(LithpType to) = 0;
 	LithpType GetType() const { return this->type; }
 	template<typename T> T GetValue() const {
 		return (T)this->value;
@@ -65,10 +66,11 @@ public:
 		return dynamic_cast<C*>(this);
 	}
 
-	virtual LithpInt *IntValue() { throw LithpException(); }
-	virtual double *FloatValue() { throw LithpException(); }
-	virtual LithpList_t *ListValue() { throw LithpException(); }
-	virtual LithpDict_t *DictValue() { throw LithpException(); }
+	virtual LithpInt IntValue() const = 0;
+	virtual LithpFlt FloatValue() const = 0;
+	virtual std::string StringValue() { return this->str(); }
+	virtual LithpList_t *ListValue() const = 0;
+	virtual LithpDict_t *DictValue() const = 0;
 
 	std::string str() {
 		return this->_str();
@@ -76,71 +78,181 @@ public:
 protected:
 	virtual std::string _str() = 0;
 	const LithpType type;
-	void* value;
+	const void* value;
+	virtual LithpObject *op_add(LithpObject *a, LithpObject *b) = 0;
+	virtual LithpObject *op_sub(LithpObject *a, LithpObject *b) = 0;
+	virtual LithpObject *op_mul(LithpObject *a, LithpObject *b) = 0;
+	virtual LithpObject *op_div(LithpObject *a, LithpObject *b) = 0;
 private:
 };
 
-class LithpInteger : public LithpObject {
+LithpObject *lithp_int(LithpInt i);
+LithpObject *lithp_flt(LithpFlt f);
+LithpObject *lithp_str(std::string s);
+
+///
+/// An abstract Value class.
+/// This supports math operators, but not container operators.
+class LithpValue : public LithpObject {
 public:
-	LithpInteger(LithpInt v) : LithpObject(new LithpInt(v), Integer) {}
+	LithpValue(void* v, LithpType t) : LithpObject(v, t) {
+	}
+	LithpValue(const LithpValue &o) : LithpObject(o) {
+	}
+	LithpList_t *ListValue() const { throw LithpException(); }
+	LithpDict_t *DictValue() const { throw LithpException(); }
+	bool can_coerce(LithpType to) {
+		if (to == this->GetType())
+			return true;
+		switch (to) {
+			case Float:
+			case String:
+				return true;
+			default:
+				return false;
+		}
+	}
+	LithpObject *coerce(LithpType to) {
+		// TODO
+		throw LithpException();
+	}
+protected:
+	LithpType optimal_coerce(LithpType a, LithpType b) {
+		if (a == b)
+			return a;
+		if (a == String && b != String)
+			return String;
+		if (a == Float || b == Float)
+			return Float;
+		return a;
+	}
+	LithpObject *op_add(LithpObject *a, LithpObject *b) {
+		LithpType optimal = this->optimal_coerce(a->GetType(), b->GetType());
+		if (!a->can_coerce(optimal))
+			throw LithpException();
+		if (!b->can_coerce(optimal))
+			throw LithpException();
+		LithpObject *ca = a->coerce(optimal);
+		LithpObject *cb = b->coerce(optimal);
+		switch (optimal) {
+			case String:
+			{
+				std::string result = ca->str();
+				result += cb->str();
+				return lithp_str(result);
+			}
+			case Integer:
+			{
+				LithpInt result = ca->IntValue();
+				result += cb->IntValue();
+				return lithp_int(result);
+			}
+			case Float:
+			{
+				LithpFlt result = ca->FloatValue();
+				result += cb->FloatValue();
+				return lithp_flt(result);
+			}
+			default:
+				throw LithpException();
+		}
+	}
+	LithpObject *op_sub(LithpObject *a, LithpObject *b) { throw LithpException(); }
+	LithpObject *op_mul(LithpObject *a, LithpObject *b) { throw LithpException(); }
+	LithpObject *op_div(LithpObject *a, LithpObject *b) { throw LithpException(); }
+};
+
+///
+/// An abstract Container value.
+/// This supports container operations, but not math operations.
+class LithpContainer : public LithpObject {
+public:
+	LithpContainer(void* v, LithpType t) : LithpObject(v, t) {
+	}
+	LithpContainer(const LithpContainer &o) : LithpObject(o) {
+	}
+	bool can_coerce(LithpType to) {
+		if (to == this->GetType())
+			return true;
+		return false;
+	}
+	LithpObject *coerce(LithpType to) {
+		// TODO
+		throw LithpException();
+	}
+	LithpInt IntValue() const { throw LithpException(); }
+	LithpFlt FloatValue() const { throw LithpException(); }
+	std::string StringValue() {
+		return this->_str();
+	}
+protected:
+	LithpObject *op_add(LithpObject *a, LithpObject *b) { throw LithpException(); }
+	LithpObject *op_sub(LithpObject *a, LithpObject *b) { throw LithpException(); }
+	LithpObject *op_mul(LithpObject *a, LithpObject *b) { throw LithpException(); }
+	LithpObject *op_div(LithpObject *a, LithpObject *b) { throw LithpException(); }
+};
+
+class LithpInteger : public LithpValue {
+public:
+	LithpInteger(LithpInt v) : LithpValue(new LithpInt(v), Integer) {}
 	LithpInteger(int v) : LithpInteger(LithpInt(v)) {}
 	LithpInteger(long v) : LithpInteger(LithpInt(v)) {}
 	LithpInteger(unsigned int v) : LithpInteger(LithpInt(v)) {}
 	LithpInteger(unsigned long v) : LithpInteger(LithpInt(v)) {}
-	~LithpInteger() { delete(this->IntValue()); }
-	LithpInt *IntValue() const { return this->GetValue<LithpInt*>(); }
+	~LithpInteger() { delete(this->value); }
+	LithpInt IntValue() const { return *this->GetValue<LithpInt*>(); }
+	LithpFlt FloatValue() const { throw LithpException(); }
 	void Test();
-	bool can_coerce(LithpType to) {
-		switch (to) {
-			case Float:
-				return true;
-			case String:
-				return true;
-			default:
-				return false;
-		}
-	}
 	LithpObject *coerce(LithpType to);
 protected:
+	LithpInteger(LithpInt v, LithpType t) : LithpValue(new LithpInt(v), t) {}
 	std::string _str();
 private:
 };
 
-class LithpFloat : public LithpObject {
+typedef std::shared_ptr<LithpInteger> LithpInteger_p;
+
+class LithpAtom : public LithpInteger {
 public:
-	LithpFloat(float v) : LithpObject(new double((double)v), Float) {}
-	LithpFloat(double v) : LithpObject(new double(v), Float) {}
-	LithpFloat(int v) : LithpObject(new double((double)v), Float) {}
-	~LithpFloat() { delete(this->FloatValue()); }
-	double* FloatValue() const { return this->GetValue<double*>(); }
-	bool can_coerce(LithpType to) {
-		switch (to) {
-			case Integer:
-				return true;
-			case String:
-				return true;
-			default:
-				return false;
-		}
-	}
+	LithpAtom(std::string name, LithpInt id) : LithpInteger(id, Atom), name(name) {}
+	std::string getName() const { return this->name; }
+protected:
+	const std::string name;
+};
+
+typedef std::shared_ptr<LithpAtom> LithpAtom_p;
+
+LithpAtom_p GetAtom(int id);
+LithpAtom_p GetAtom(std::string name);
+
+class LithpFloat : public LithpValue {
+public:
+	LithpFloat(float v) : LithpValue(new LithpFlt((LithpFlt)v), Float) {}
+	LithpFloat(LithpFlt v) : LithpValue(new LithpFlt(v), Float) {}
+	LithpFloat(int v) : LithpValue(new LithpFlt((LithpFlt)v), Float) {}
+	~LithpFloat() { delete(this->value); }
+	LithpInt IntValue() const { throw LithpException(); }
+	LithpFlt FloatValue() const { return *this->GetValue<LithpFlt*>(); }
 protected:
 	std::string _str();
 };
 
-class LithpString : public LithpObject {
+class LithpString : public LithpValue {
 public:
-	LithpString(std::string v) : LithpObject(new std::string(v), String) {}
-	LithpString() : LithpObject(new std::string(""), String) {}
-	~LithpString() { delete(this->StringValue()); }
-	std::string* StringValue() { return this->GetValue<std::string*>(); }
+	LithpString(std::string v) : LithpValue(new std::string(v), String) {}
+	LithpString() : LithpValue(new std::string(""), String) {}
+	~LithpString() { delete(this->value); }
+	LithpInt IntValue() const { /* TODO: Implement int parsing */ throw LithpException(); }
+	LithpFlt FloatValue() const { /* TODO: Implement float parsing */ throw LithpException(); }
+	std::string StringValue() const { return *this->GetValue<std::string*>(); }
 protected:
 	std::string _str();
 private:
 };
 
-class LithpList : public LithpObject {
+class LithpList : public LithpContainer {
 public:
-	LithpList() : LithpObject(new LithpList_t(), List) { }
+	LithpList() : LithpContainer(new LithpList_t(), List) { }
 	~LithpList() {
 		LithpList_t *list = this->ListValue();
 		list->clear();
@@ -152,27 +264,32 @@ public:
 	size_t length() const {
 		return this->ListValue()->size();
 	}
+	LithpObject_p at(int index) {
+		return this->ListValue()->at(index);
+	}
+	LithpDict_t *DictValue() const { throw LithpException(); }
 protected:
-	LithpList(LithpType type) : LithpObject(new LithpList_t(), type) { }
-	LithpList(LithpList_t v, LithpType type) : LithpObject(new LithpList_t(v), type) { }
+	LithpList(LithpType type) : LithpContainer(new LithpList_t(), type) { }
+	LithpList(LithpList_t v, LithpType type) : LithpContainer(new LithpList_t(v), type) { }
 	std::string _str();
 private:
 };
 
-class LithpDict : public LithpObject {
+class LithpDict : public LithpContainer {
 public:
-	LithpDict() : LithpObject(new LithpDict_t(), Dict) {
+	LithpDict() : LithpContainer(new LithpDict_t(), Dict) {
 	}
 	~LithpDict() {
 		LithpDict_t *dict = this->DictValue();
 		dict->clear();
 		delete dict;
 	}
+	LithpList_t* ListValue() const { throw LithpException(); }
 	LithpDict_t* DictValue() const { return this->GetValue<LithpDict_t*>(); }
 	LithpObject* Get(std::string name);
 protected:
-	LithpDict(LithpType type) : LithpObject(new LithpDict_t(), type) { }
-	LithpDict(LithpDict_t v, LithpType type) : LithpObject(new LithpDict_t(v), type) { }
+	LithpDict(LithpType type) : LithpContainer(new LithpDict_t(), type) { }
+	LithpDict(LithpDict_t v, LithpType type) : LithpContainer(new LithpDict_t(v), type) { }
 	std::string _str();
 private:
 };
@@ -180,18 +297,17 @@ private:
 class LithpClosure : public LithpDict {
 public:
 	LithpClosure(LithpOpChain* _owner) : LithpDict(OpChainClosure),
-		owner(_owner), topmost(LithpClosure_p(this))
+		parent(LithpClosure_p(this)), topmost(LithpClosure_p(this)), owner(_owner)
 	{ }
 	LithpClosure(LithpOpChain* _owner, LithpClosure_p _parent) : LithpDict(OpChainClosure),
-		parent(_parent), topmost(_parent.get()->parent),
-		owner(_owner)
+		parent(_parent), topmost(_parent.get()->parent), owner(_owner)
 	{ }
 
-	LithpClosure_p parent = 0;
+	LithpClosure_p parent;
 	LithpClosure* getParent() { return this->parent.get(); }
-	LithpClosure_p topmost = 0;
+	LithpClosure_p topmost;
 	LithpClosure* getTopmost() { return this->topmost.get(); }
-	LithpOpChain_p owner = 0;
+	LithpOpChain_p owner;
 	LithpOpChain* getOwner() { return this->owner.get(); }
 
 	// Implement these functions inline for speed.
@@ -255,6 +371,9 @@ public:
 			return this->getParent()->get(key);
 		throw LithpException();
 	}
+	int length() {
+		return this->ListValue()->size();
+	}
 protected:
 private:
 };
@@ -278,8 +397,9 @@ public:
 
 protected:
 	int pos = -1;
-	const LithpOpChain_p parent;
+	LithpOpChain_p parent;
 	const LithpClosure_p closure;
+	LithpObject *current = nullptr;
 private:
 };
 }
